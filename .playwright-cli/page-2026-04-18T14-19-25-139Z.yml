@@ -1,0 +1,75 @@
+- generic [ref=e2]:
+  - generic [ref=e4]:
+    - generic [ref=e11]:
+      - generic [ref=e12]:
+        - img [ref=e14]
+        - generic [ref=e16]: VibeControls
+      - generic [ref=e17]:
+        - heading "Developer Control Panel" [level=1] [ref=e18]
+        - paragraph [ref=e19]: Unify your teams, projects, and workflows in one intelligent workspace. Built for scale with enterprise-grade security, real-time collaboration, and seamless integrations across your entire organization.
+        - generic [ref=e20]:
+          - generic [ref=e21]:
+            - img [ref=e23]
+            - generic [ref=e25]: Modular workspace architecture
+          - generic [ref=e26]:
+            - img [ref=e28]
+            - generic [ref=e30]: Real-time collaboration & sync
+          - generic [ref=e31]:
+            - img [ref=e33]
+            - generic [ref=e35]: Enterprise-grade security & SSO
+          - generic [ref=e36]:
+            - img [ref=e38]
+            - generic [ref=e40]: Unlimited scalability & performance
+      - generic [ref=e41]: © 2026 Burdenoff. All rights reserved.
+    - generic [ref=e42]:
+      - button "Change language" [ref=e45]:
+        - generic [ref=e46]: en
+        - img [ref=e47]
+      - generic [ref=e49]:
+        - generic [ref=e50]:
+          - heading "Welcome back" [level=2] [ref=e51]
+          - paragraph [ref=e52]: Enter your credentials to continue
+        - generic [ref=e53]:
+          - generic [ref=e54]:
+            - generic [ref=e55]: Email
+            - generic [ref=e56]:
+              - generic:
+                - img
+              - textbox "Email" [ref=e57]:
+                - /placeholder: you@example.com
+          - generic [ref=e58]:
+            - generic [ref=e59]: Password
+            - generic [ref=e60]:
+              - generic:
+                - img
+              - textbox "Password" [ref=e61]:
+                - /placeholder: Enter your password
+              - button [ref=e62]:
+                - img [ref=e63]
+          - generic [ref=e66]:
+            - generic [ref=e67] [cursor=pointer]:
+              - generic [ref=e68]:
+                - checkbox "Remember me" [ref=e69]
+                - img [ref=e71]
+              - generic [ref=e73]: Remember me
+            - button "Forgot password?" [ref=e74]
+          - button "Sign in" [ref=e75]
+        - generic [ref=e80]: or continue with
+        - generic [ref=e81]:
+          - button "Google" [disabled] [ref=e82]:
+            - img [ref=e83]
+            - generic [ref=e88]: Google
+          - button "GitHub" [disabled] [ref=e89]:
+            - img [ref=e90]
+            - generic [ref=e92]: GitHub
+          - button "Microsoft" [disabled] [ref=e93]:
+            - img [ref=e94]
+            - generic [ref=e99]: Microsoft
+        - button "Sign in with Enterprise SSO" [ref=e101]:
+          - img [ref=e102]
+          - generic [ref=e104]: Sign in with Enterprise SSO
+        - button "Prefer passwordless login? Sign in with Magic Link" [ref=e106]
+        - paragraph [ref=e107]:
+          - text: Don't have an account?
+          - button "Sign up" [ref=e108]
+  - region "Notifications alt+T"
