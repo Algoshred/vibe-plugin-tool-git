@@ -1,6 +1,6 @@
 {
   "name": "@vibecontrols/vibe-plugin-git",
-  "version": "0.0.0-dev",
+  "version": "2026.428.1",
   "main": "./dist/index.js",
   "type": "module",
   "engines": {
@@ -33,7 +33,7 @@
     "url": "https://github.com/tvvignesh"
   },
   "license": "SEE LICENSE IN LICENSE",
-  "description": "Visual Git Client (Ungit) — reverse-proxied through the VibeControls agent",
+  "description": "Visual Git Client (Ungit) \u2014 reverse-proxied through the VibeControls agent",
   "dependencies": {
     "ungit": "^1.5.28"
   },
