@@ -139,7 +139,7 @@ interface BridgeState {
 }
 
 const bridges = new Map<string, BridgeState>();
-let bridgeCounter = 0;
+const bridgeCounter = 0;
 
 // -- Create proxy -----------------------------------------------------------
 
