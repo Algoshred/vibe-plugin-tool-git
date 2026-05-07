@@ -16,7 +16,10 @@
 import type { Elysia } from "elysia";
 import type { Command } from "commander";
 import type { HostServices, VibePlugin } from "./types.js";
+import type { GitPluginRouteDeps } from "./git-types.js";
 import { getRunningPort, stopUngit } from "./lib/process.js";
+import { createRoutes as createGitTrackerRoutes } from "./git-routes.js";
+import { registerGitCommands } from "./git-commands.js";
 import {
   runMultimode,
   pickOutputMode,
@@ -118,9 +121,36 @@ export const vibePlugin: VibePlugin = {
       ),
     );
 
-    console.log(
-      "  Plugin 'ungit' registered routes: /api/ungit, /ungit",
-    );
+    // Mount the merged git-repository tracker routes at /api/git when the
+    // agent has injected the storage surface. The host's PluginRouteDeps
+    // contract exposes db + serviceRegistry, so we look them up off the
+    // app decorator to keep this back-compatible.
+    try {
+      const decorated = app as unknown as {
+        decorator: { db?: unknown; serviceRegistry?: unknown };
+      };
+      const db = decorated.decorator?.db;
+      const serviceRegistry = decorated.decorator?.serviceRegistry;
+      if (db && serviceRegistry) {
+        const gitDeps: GitPluginRouteDeps = {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          db: db as any,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          serviceRegistry: serviceRegistry as any,
+        };
+        app.group("/api/git", (group) =>
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          group.use(createGitTrackerRoutes(gitDeps) as any),
+        );
+        console.log(
+          "  Plugin 'ungit' also registered: /api/git (repo tracker)",
+        );
+      }
+    } catch (err) {
+      console.warn("  Plugin 'ungit' git tracker mount skipped:", err);
+    }
+
+    console.log("  Plugin 'ungit' registered routes: /api/ungit, /ungit");
   },
 
   async onServerStop() {
@@ -180,24 +210,20 @@ export const vibePlugin: VibePlugin = {
       .option("--dir <dir>", "Working directory for git operations")
       .option("--port <port>", "Port to bind to")
       .option("--json", "Emit JSON")
-      .action(
-        async (opts: { dir?: string; port?: string } & OutputFlags) => {
-          const body: Record<string, unknown> = {};
-          if (opts.dir) body.workingDir = opts.dir;
-          if (opts.port) body.port = parseInt(opts.port, 10);
+      .action(async (opts: { dir?: string; port?: string } & OutputFlags) => {
+        const body: Record<string, unknown> = {};
+        if (opts.dir) body.workingDir = opts.dir;
+        if (opts.port) body.port = parseInt(opts.port, 10);
 
-          const res = await apiFetch("/api/ungit/start", {
-            method: "POST",
-            body: JSON.stringify(body),
-          });
-          const data = await res.json();
-          if (
-            maybePrintJson(opts, { ok: true, action: "start", result: data })
-          )
-            return;
-          console.log(JSON.stringify(data, null, 2));
-        },
-      );
+        const res = await apiFetch("/api/ungit/start", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (maybePrintJson(opts, { ok: true, action: "start", result: data }))
+          return;
+        console.log(JSON.stringify(data, null, 2));
+      });
 
     // vibe ungit stop
     cmd
@@ -227,12 +253,13 @@ export const vibePlugin: VibePlugin = {
           body: JSON.stringify(body),
         });
         const data = await res.json();
-        if (
-          maybePrintJson(opts, { ok: true, action: "restart", result: data })
-        )
+        if (maybePrintJson(opts, { ok: true, action: "restart", result: data }))
           return;
         console.log(JSON.stringify(data, null, 2));
       });
+
+    // Also register the merged `vibe git ...` repo-tracker subcommands.
+    registerGitCommands(program);
   },
 };
 

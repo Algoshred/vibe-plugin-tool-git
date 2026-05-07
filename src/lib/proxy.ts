@@ -193,10 +193,10 @@ async function handleProxyRequest(
   // Verify Ungit is running
   const port = getPort();
   if (!port) {
-    return new Response(
-      JSON.stringify({ error: "Ungit is not running" }),
-      { status: 503, headers: { "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "Ungit is not running" }), {
+      status: 503,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 
   const response = await handleHttpProxy(request, port);
@@ -272,7 +272,10 @@ async function handleHttpProxy(
     const contentType = upstreamResponse.headers.get("content-type") || "";
     if (strippedPath === "/ungit/" && !contentType.includes("text/html")) {
       const body = await upstreamResponse.text();
-      if (body.trimStart().startsWith("<!DOCTYPE") || body.trimStart().startsWith("<html")) {
+      if (
+        body.trimStart().startsWith("<!DOCTYPE") ||
+        body.trimStart().startsWith("<html")
+      ) {
         responseHeaders.set("content-type", "text/html; charset=utf-8");
         responseHeaders.delete("content-length");
         return new Response(body, {
