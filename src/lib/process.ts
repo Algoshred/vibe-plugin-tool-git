@@ -67,8 +67,10 @@ export async function checkInstallation(): Promise<{
 }> {
   // Check local node_modules first (plugin dependency)
   try {
-    const localPath = new URL("../../node_modules/.bin/ungit", import.meta.url)
-      .pathname;
+    const localPath = new URL(
+      "../../node_modules/.bin/ungit",
+      import.meta.url,
+    ).pathname;
     const file = Bun.file(localPath);
     if (await file.exists()) {
       return { installed: true, binaryPath: localPath };
