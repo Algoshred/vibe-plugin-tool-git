@@ -84,6 +84,12 @@ let agentApiKey: string | null = null;
 // ---------------------------------------------------------------------------
 
 export const vibePlugin: VibePlugin = {
+  capabilities: {
+    storage: "rw",
+    subprocess: true,
+    audit: true,
+    telemetry: true,
+  },
   name: "ungit",
   version: "1.0.0",
   description: "Visual Git Client (Ungit)",
@@ -94,6 +100,7 @@ export const vibePlugin: VibePlugin = {
   publicPaths: ["/ungit/"],
 
   async onServerStart(app: Elysia, hostServices: HostServices) {
+    hostServices?.telemetry?.emit("tool.ready", { provider: "git" });
     // Register REST API routes
     const { createUngitRoutes } = await import("./routes.js");
     app.use(createUngitRoutes(hostServices));
