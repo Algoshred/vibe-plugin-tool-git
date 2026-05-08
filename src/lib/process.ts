@@ -79,19 +79,14 @@ export async function checkInstallation(): Promise<{
     // Not found locally
   }
 
-  // Check global
+  // Check global via Bun.which (cross-platform; handles PATHEXT on Windows).
   try {
-    const proc = Bun.spawn(["which", "ungit"], {
-      stdout: "pipe",
-      stderr: "pipe",
-    });
-    await proc.exited;
-    if (proc.exitCode === 0) {
-      const path = (await new Response(proc.stdout).text()).trim();
+    const path = Bun.which("ungit");
+    if (path) {
       return { installed: true, binaryPath: path };
     }
   } catch {
-    // which not found or failed
+    // not found
   }
 
   return { installed: false };
