@@ -41,7 +41,10 @@ interface OpenTuiBox {
 
 interface OpenTuiCore {
   createCliRenderer: (cfg: Record<string, unknown>) => Promise<OpenTuiRenderer>;
-  BoxRenderable: new (ctx: unknown, opts: Record<string, unknown>) => OpenTuiBox;
+  BoxRenderable: new (
+    ctx: unknown,
+    opts: Record<string, unknown>,
+  ) => OpenTuiBox;
   TextRenderable: new (
     ctx: unknown,
     opts: Record<string, unknown>,
@@ -57,7 +60,8 @@ interface OpenTuiCore {
 }
 
 async function loadCore(): Promise<OpenTuiCore> {
-  // @ts-expect-error — optional dep not declared in plugin package.json
+  // Dynamic import — falls through to plain renderer if the optional
+  // package isn't resolvable at runtime.
   return (await import("@opentui/core")) as unknown as OpenTuiCore;
 }
 

@@ -9,15 +9,20 @@
  *   POST /start    - Start Ungit with optional working directory and port
  *   POST /stop     - Stop the Ungit process
  *   POST /restart  - Restart Ungit with optional new working directory
+ *
+ * Built on `RoutesBuilder` from `@vibecontrols/plugin-sdk/routes` —
+ * concerns like prefix, error handler, and logging fold through the SDK.
  */
 
-import { Elysia } from "elysia";
-import type { HostServices, StartBody } from "./types.js";
+import type { Elysia } from "elysia";
+
+import { RoutesBuilder } from "@vibecontrols/plugin-sdk/routes";
+import type { HostServices } from "@vibecontrols/plugin-sdk/contract";
+
+import type { StartBody } from "./types.js";
 import {
   checkInstallation,
   installUngit,
-} from "./lib/process.js";
-import {
   startUngit,
   stopUngit,
   getStatus as getProcessStatus,
@@ -27,9 +32,16 @@ import {
 let isInstalling = false;
 let installError: string | null = null;
 
-export function createUngitRoutes(_hostServices: HostServices) {
-  return new Elysia({ prefix: "/api/ungit" })
+export function createUngitRoutes(hostServices: HostServices): Elysia {
+  const app = new RoutesBuilder("ungit", hostServices)
+    .withPrefix("/api/ungit")
+    .withErrorHandler()
+    .build();
 
+  // Elysia narrows its generics on every chained handler — the chained
+  // result is structurally identical to the default-parameter `Elysia`
+  // we promised the caller, so re-cast through unknown.
+  const wired = app
     // GET /api/ungit/status
     .get("/status", async () => {
       const installInfo = await checkInstallation();
@@ -149,4 +161,6 @@ export function createUngitRoutes(_hostServices: HostServices) {
         };
       }
     });
+
+  return wired as unknown as Elysia;
 }

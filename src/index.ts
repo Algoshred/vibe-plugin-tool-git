@@ -1,5 +1,5 @@
 /**
- * @burdenoff/vibe-plugin-git v1.0.0
+ * @vibecontrols/vibe-plugin-tool-git
  *
  * Visual Git Client via Ungit — reverse-proxied through the VibeControls
  * agent. Manages the Ungit child process lifecycle (install, start, stop)
@@ -8,49 +8,41 @@
  * Registers:
  *   - Elysia routes: /api/ungit/*  (REST API)
  *   - Proxy routes:  /ungit/*      (reverse proxy to ungit)
- *   - CLI command:   vibe ungit {status,install,start,stop}
+ *   - CLI command:   vibe ungit {status,install,start,stop,restart}
  *
- * Install: vibe plugin install @burdenoff/vibe-plugin-git
+ * Migrated to consume `@vibecontrols/plugin-sdk` for the contract,
+ * lifecycle, telemetry, CLI multimode, and redaction helpers.
  */
 
-import type { Elysia } from "elysia";
 import type { Command } from "commander";
-import type { HostServices, VibePlugin } from "./types.js";
-import { getRunningPort, stopUngit } from "./lib/process.js";
+
 import {
-  runMultimode,
+  createLifecycleHooks,
   pickOutputMode,
+  redact,
+  runMultimode,
   maybePrintJson,
+  TelemetryEmitter,
+  type HostServices,
   type OutputFlags,
-} from "./utils/multimode.js";
+  type VibePlugin,
+} from "@vibecontrols/plugin-sdk";
+
+import type { UngitStatus } from "./types.js";
+import { getRunningPort, stopUngit } from "./lib/process.js";
 import { interactiveDetail } from "./utils/interactive.js";
 
-// ---------------------------------------------------------------------------
-// JSON shaping helpers
-// ---------------------------------------------------------------------------
+export type { UngitStatus, StartBody } from "./types.js";
 
-const SECRET_RX = /(token|secret|password|apikey|api_key)/i;
-
-function redact(value: unknown): unknown {
-  if (value === null || value === undefined) return value;
-  if (Array.isArray(value)) return value.map(redact);
-  if (typeof value !== "object") return value;
-  const out: Record<string, unknown> = {};
-  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-    out[k] = SECRET_RX.test(k) ? "[redacted]" : redact(v);
-  }
-  return out;
-}
-
-// Re-export types for external consumers
-export type {
-  VibePlugin,
-  HostServices,
-  StorageProvider,
-  EventBus,
-  ServiceRegistry,
-  UngitStatus,
-} from "./types.js";
+/**
+ * Local extension of the SDK contract — agrees additive fields the host
+ * agent reads from the registry (UI flag + public path allowlist) that
+ * the SDK contract leaves to the host implementation.
+ */
+type UngitVibePlugin = VibePlugin & {
+  hasUI?: boolean;
+  publicPaths?: string[];
+};
 
 // ---------------------------------------------------------------------------
 // CLI helpers
@@ -83,15 +75,31 @@ let agentApiKey: string | null = null;
 // Plugin definition
 // ---------------------------------------------------------------------------
 
-export const vibePlugin: VibePlugin = {
+const PLUGIN_NAME = "ungit";
+const PLUGIN_VERSION = "2026.508.4";
+
+const lifecycle = createLifecycleHooks({
+  name: PLUGIN_NAME,
+  telemetryEventName: "tool.ready",
+  onInit: async (hostServices: HostServices) => {
+    const telemetry = new TelemetryEmitter(
+      PLUGIN_NAME,
+      PLUGIN_VERSION,
+      hostServices,
+    );
+    telemetry.emitEvent("tool.ready", { provider: "git" });
+  },
+});
+
+export const vibePlugin: UngitVibePlugin = {
   capabilities: {
     storage: "rw",
     subprocess: true,
     audit: true,
     telemetry: true,
   },
-  name: "ungit",
-  version: "1.0.0",
+  name: PLUGIN_NAME,
+  version: PLUGIN_VERSION,
   description: "Visual Git Client (Ungit)",
   tags: ["frontend", "integration"],
   hasUI: true,
@@ -99,23 +107,29 @@ export const vibePlugin: VibePlugin = {
   apiPrefix: "/api/ungit",
   publicPaths: ["/ungit/"],
 
-  async onServerStart(app: Elysia, hostServices: HostServices) {
-    hostServices?.telemetry?.emit("tool.ready", { provider: "git" });
+  async onServerStart(app: unknown, hostServices: HostServices) {
+    await lifecycle.onServerStart(app, hostServices);
+
+    // The host agent passes a real Elysia instance; cast to use it.
+    const elysiaApp = app as {
+      use: (plugin: unknown) => unknown;
+      decorator?: { apiKey?: string };
+    };
+
     // Register REST API routes
     const { createUngitRoutes } = await import("./routes.js");
-    app.use(createUngitRoutes(hostServices));
+    elysiaApp.use(createUngitRoutes(hostServices));
 
     // Capture the API key from the app's decorator for proxy auth
     try {
-      const decorated = app as unknown as { decorator: { apiKey?: string } };
-      agentApiKey = decorated.decorator?.apiKey ?? null;
+      agentApiKey = elysiaApp.decorator?.apiKey ?? null;
     } catch {
       agentApiKey = process.env.AGENT_API_KEY ?? null;
     }
 
     // Mount reverse proxy at /ungit/*
     const { createUngitProxy } = await import("./lib/proxy.js");
-    app.use(
+    elysiaApp.use(
       createUngitProxy(
         () => getRunningPort(),
         (key: string) => {
@@ -125,17 +139,18 @@ export const vibePlugin: VibePlugin = {
       ),
     );
 
-    console.log(
-      "  Plugin 'ungit' registered routes: /api/ungit, /ungit",
+    process.stdout.write(
+      "  Plugin 'ungit' registered routes: /api/ungit, /ungit\n",
     );
   },
 
   async onServerStop() {
     await stopUngit();
-    console.log("  Plugin 'ungit' stopped");
+    process.stdout.write("  Plugin 'ungit' stopped\n");
   },
 
-  onCliSetup(program: Command) {
+  onCliSetup(programArg: unknown) {
+    const program = programArg as Command;
     const cmd = program
       .command("ungit")
       .description("Visual Git Client (Ungit)");
@@ -147,14 +162,14 @@ export const vibePlugin: VibePlugin = {
       .option("--json", "Emit JSON")
       .option("--plain", "Force plain text output")
       .action(async (opts: OutputFlags) => {
-        await runMultimode<unknown>({
+        await runMultimode<UngitStatus>({
           mode: pickOutputMode(opts),
           fetchData: async () => {
             const res = await apiFetch("/api/ungit/status");
-            return await res.json();
+            return (await res.json()) as UngitStatus;
           },
           plain: (data) => {
-            console.log(JSON.stringify(data, null, 2));
+            process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
           },
           interactive: async (data) => {
             await interactiveDetail({
@@ -172,12 +187,12 @@ export const vibePlugin: VibePlugin = {
       .description("Install Ungit globally via npm")
       .option("--json", "Emit JSON")
       .action(async (opts: OutputFlags) => {
-        if (!opts.json) console.log("Installing Ungit...");
+        if (!opts.json) process.stdout.write("Installing Ungit...\n");
         const res = await apiFetch("/api/ungit/install", { method: "POST" });
         const data = await res.json();
         if (maybePrintJson(opts, { ok: true, action: "install", result: data }))
           return;
-        console.log(JSON.stringify(data, null, 2));
+        process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
       });
 
     // vibe ungit start [--dir <dir>] [--port <port>]
@@ -187,24 +202,20 @@ export const vibePlugin: VibePlugin = {
       .option("--dir <dir>", "Working directory for git operations")
       .option("--port <port>", "Port to bind to")
       .option("--json", "Emit JSON")
-      .action(
-        async (opts: { dir?: string; port?: string } & OutputFlags) => {
-          const body: Record<string, unknown> = {};
-          if (opts.dir) body.workingDir = opts.dir;
-          if (opts.port) body.port = parseInt(opts.port, 10);
+      .action(async (opts: { dir?: string; port?: string } & OutputFlags) => {
+        const body: Record<string, unknown> = {};
+        if (opts.dir) body.workingDir = opts.dir;
+        if (opts.port) body.port = parseInt(opts.port, 10);
 
-          const res = await apiFetch("/api/ungit/start", {
-            method: "POST",
-            body: JSON.stringify(body),
-          });
-          const data = await res.json();
-          if (
-            maybePrintJson(opts, { ok: true, action: "start", result: data })
-          )
-            return;
-          console.log(JSON.stringify(data, null, 2));
-        },
-      );
+        const res = await apiFetch("/api/ungit/start", {
+          method: "POST",
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (maybePrintJson(opts, { ok: true, action: "start", result: data }))
+          return;
+        process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
+      });
 
     // vibe ungit stop
     cmd
@@ -216,7 +227,7 @@ export const vibePlugin: VibePlugin = {
         const data = await res.json();
         if (maybePrintJson(opts, { ok: true, action: "stop", result: data }))
           return;
-        console.log(JSON.stringify(data, null, 2));
+        process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
       });
 
     // vibe ungit restart [--dir <dir>]
@@ -234,11 +245,9 @@ export const vibePlugin: VibePlugin = {
           body: JSON.stringify(body),
         });
         const data = await res.json();
-        if (
-          maybePrintJson(opts, { ok: true, action: "restart", result: data })
-        )
+        if (maybePrintJson(opts, { ok: true, action: "restart", result: data }))
           return;
-        console.log(JSON.stringify(data, null, 2));
+        process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
       });
   },
 };
