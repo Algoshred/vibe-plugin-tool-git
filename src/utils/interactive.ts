@@ -62,6 +62,7 @@ interface OpenTuiCore {
 async function loadCore(): Promise<OpenTuiCore> {
   // Dynamic import — falls through to plain renderer if the optional
   // package isn't resolvable at runtime.
+  // @ts-expect-error — optional dep not declared in plugin package.json
   return (await import("@opentui/core")) as unknown as OpenTuiCore;
 }
 

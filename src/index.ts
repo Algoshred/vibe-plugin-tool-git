@@ -78,7 +78,7 @@ let agentApiKey: string | null = null;
 // ---------------------------------------------------------------------------
 
 const PLUGIN_NAME = "ungit";
-const PLUGIN_VERSION = "2026.509.1";
+const PLUGIN_VERSION = "2026.509.2";
 
 export const createPlugin: VibePluginFactory = (
   _ctx: ProfileContext,

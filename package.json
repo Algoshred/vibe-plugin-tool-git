@@ -1,6 +1,6 @@
 {
   "name": "@vibecontrols/vibe-plugin-tool-git",
-  "version": "2026.509.1",
+  "version": "2026.509.2",
   "main": "./dist/index.js",
   "type": "module",
   "engines": {
