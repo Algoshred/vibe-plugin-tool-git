@@ -33,7 +33,7 @@
     "url": "https://github.com/tvvignesh"
   },
   "license": "SEE LICENSE IN LICENSE",
-  "description": "Visual Git Client (Ungit) — reverse-proxied through the VibeControls agent",
+  "description": "Visual Git Client (Ungit) \u2014 reverse-proxied through the VibeControls agent",
   "dependencies": {
     "@vibecontrols/plugin-sdk": "2026.509.2",
     "ungit": "^1.5.28"
@@ -67,8 +67,8 @@
   },
   "homepage": "https://vibecontrols.com",
   "publishConfig": {
-    "access": "restricted",
-    "registry": "https://verdaccio.tooling.internal.burdenoff.com/"
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
   },
   "files": [
     "dist/**/*",
