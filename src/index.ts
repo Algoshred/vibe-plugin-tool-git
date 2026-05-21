@@ -41,9 +41,46 @@ export type { UngitStatus, StartBody } from "./types.js";
  * agent reads from the registry (UI flag + public path allowlist) that
  * the SDK contract leaves to the host implementation.
  */
+interface PluginCapabilitiesV1 {
+  restPaths: string[];
+  wsTopics: string[];
+  rpcMethods: string[];
+}
+
+interface PluginContributionV1 {
+  mountPoint: string;
+  id: string;
+  title: string;
+  icon?: string;
+  order?: number;
+  runtimes: Array<"iframe" | "in-process">;
+  capabilities: PluginCapabilitiesV1;
+  /**
+   * Free-form mount-point metadata. The agent's contributions endpoint
+   * reads `meta.url` to override the default `/ui/<pluginKey>` iframe
+   * src — needed here because Ungit lives at `/ungit/`, not under
+   * `/ui/...`.
+   */
+  meta?: { url?: string };
+}
+
 type UngitVibePlugin = VibePlugin & {
   hasUI?: boolean;
   publicPaths?: string[];
+  /**
+   * PR-12c — declare the Ungit UI as a `vibe.detailTab` contribution
+   * so the Vibe detail page renders it in the strip when the host's
+   * `vibes.tabs.gitops-iframe` flag is on. `meta.url` points at
+   * `/ungit/` (the existing reverse-proxied Ungit instance) rather
+   * than the default `/ui/<pluginKey>`.
+   */
+  ui?: {
+    title: string;
+    icon?: string;
+    staticDir?: string;
+    capabilities?: PluginCapabilitiesV1;
+    contributions?: PluginContributionV1[];
+  };
 };
 
 // ---------------------------------------------------------------------------
@@ -111,6 +148,57 @@ export const createPlugin: VibePluginFactory = (
     cliCommand: "ungit",
     apiPrefix: "/api/ungit",
     publicPaths: ["/ungit/"],
+    ui: {
+      title: "GitOps",
+      icon: "GitMerge",
+      // Static dir holds the simple per-Vibe Git metadata iframe
+      // (`ui-git/index.html`). Ungit lives at `/ungit/` and is served
+      // by the reverse-proxy below — not via this staticDir.
+      staticDir: `${import.meta.dir}/ui-git`,
+      capabilities: {
+        restPaths: ["/ungit", "/api/ungit", "/ui/ungit"],
+        wsTopics: [],
+        rpcMethods: ["getContext"],
+      },
+      contributions: [
+        // PR-12a — inline Git tab migration. Reads gitBranch/gitStatus/
+        // gitRemote via the host's `getContext` RPC. Tab takes the same
+        // ordering slot as the inline `git` tab (~30) so the user sees
+        // no UX shift when the flag flips.
+        {
+          mountPoint: "vibe.detailTab",
+          id: "plugin:git",
+          title: "Git",
+          icon: "GitBranch",
+          order: 30,
+          runtimes: ["iframe"],
+          capabilities: {
+            restPaths: ["/ui/ungit"],
+            wsTopics: [],
+            rpcMethods: ["getContext"],
+          },
+        },
+        // PR-12c — GitOps (Ungit) tab migration. The iframe loads the
+        // existing `/ungit/` reverse-proxied UI directly; `meta.url`
+        // overrides the default `/ui/<pluginKey>` so the iframe src
+        // points at the Ungit subprocess. Same ordering slot as the
+        // inline `gitops` tab.
+        {
+          mountPoint: "vibe.detailTab",
+          id: "plugin:gitops",
+          title: "GitOps",
+          icon: "GitMerge",
+          order: 95,
+          runtimes: ["iframe"],
+          capabilities: {
+            restPaths: ["/ungit", "/api/ungit"],
+            wsTopics: [],
+            rpcMethods: [],
+          },
+          meta: { url: "/ungit/" },
+        },
+      ],
+    },
 
     async onServerStart(app: unknown, hostServices: HostServices) {
       await lifecycle.onServerStart(app, hostServices);
