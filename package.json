@@ -35,7 +35,7 @@
   "license": "SEE LICENSE IN LICENSE",
   "description": "Visual Git Client (Ungit) \u2014 reverse-proxied through the VibeControls agent",
   "dependencies": {
-    "@vibecontrols/plugin-sdk": "2026.509.2",
+    "@vibecontrols/plugin-sdk": "2026.522.1",
     "ungit": "^1.5.28"
   },
   "devDependencies": {
