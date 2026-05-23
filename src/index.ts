@@ -242,6 +242,42 @@ export const createPlugin: VibePluginFactory = (
       process.stdout.write("  Plugin 'ungit' stopped\n");
     },
 
+    async onServerReady() {
+      // Contribute capability metadata to the LLM Context feature.
+      try {
+        const sdkContext = (await import("@vibecontrols/plugin-sdk/context")) as {
+          registerContextProvider?: (provider: {
+            name: string;
+            timeoutMs?: number;
+            getContext: () => Promise<{
+              pluginName: string;
+              description?: string;
+              data: Record<string, unknown>;
+            }>;
+          }) => void;
+        };
+        sdkContext.registerContextProvider?.({
+          name: "tool-git",
+          timeoutMs: 500,
+          async getContext() {
+            return {
+              pluginName: "tool-git",
+              description:
+                "Visual Git client (Ungit) capability metadata exposed via UI iframe contributions.",
+              data: {
+                pluginVersion: PLUGIN_VERSION,
+                cliCommand: "ungit",
+                apiPrefix: "/api/ungit",
+                tabs: ["plugin:git", "plugin:gitops"],
+              },
+            };
+          },
+        });
+      } catch {
+        // SDK doesn't support context — skip silently
+      }
+    },
+
     onCliSetup(programArg: unknown) {
       const program = programArg as Command;
       const cmd = program

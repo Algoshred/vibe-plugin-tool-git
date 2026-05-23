@@ -5,7 +5,7 @@
     "": {
       "name": "@vibecontrols/vibe-plugin-git",
       "dependencies": {
-        "@vibecontrols/plugin-sdk": "2026.509.2",
+        "@vibecontrols/plugin-sdk": "2026.522.1",
         "ungit": "^1.5.28",
       },
       "devDependencies": {
@@ -132,7 +132,7 @@
 
     "@typescript-eslint/visitor-keys": ["@typescript-eslint/visitor-keys@8.58.0", "", { "dependencies": { "@typescript-eslint/types": "8.58.0", "eslint-visitor-keys": "^5.0.0" } }, "sha512-XJ9UD9+bbDo4a4epraTwG3TsNPeiB9aShrUneAVXy8q4LuwowN+qu89/6ByLMINqvIMeI9H9hOHQtg/ijrYXzQ=="],
 
-    "@vibecontrols/plugin-sdk": ["@vibecontrols/plugin-sdk@2026.509.2", "", { "peerDependencies": { "commander": ">=14.0.0", "elysia": ">=1.3.0" }, "optionalPeers": ["commander", "elysia"] }, "sha512-fF9gRCnfwZVJr0tAsuBn2NRdsZfmZ1WdkiYNmw8yG+mfpFtneYpfCHZdEGQqVQvOO0hXUVv545ugpJ4hKirTwQ=="],
+    "@vibecontrols/plugin-sdk": ["@vibecontrols/plugin-sdk@2026.522.1", "", { "peerDependencies": { "commander": ">=14.0.0", "elysia": ">=1.3.0" }, "optionalPeers": ["commander", "elysia"] }, "sha512-jwyIU7IzCOZgXTBDwGSnc6v+9tqD4uhKlxN13p8nhwW2YSk+oohkr6nuPHF5Wc7HAqW3WBMixMcfaloYgNhXLw=="],
 
     "JSONStream": ["JSONStream@1.3.5", "", { "dependencies": { "jsonparse": "^1.2.0", "through": ">=2.2.7 <3" }, "bin": { "JSONStream": "./bin.js" } }, "sha512-E+iruNOY8VV9s4JEbe1aNEm6MiszPRr/UfcHMz0TQh1BXSxHK+ASV1R6W4HpjBhSeS+54PIsAMCBmwD06LLsqQ=="],
 
