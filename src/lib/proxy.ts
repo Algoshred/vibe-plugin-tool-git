@@ -19,8 +19,59 @@ interface Session {
   expiresAt: number;
 }
 
-const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const SESSION_TTL_MS = 60 * 60 * 1000; // 1 hour
 const COOKIE_NAME = "__vibe_ungit_session";
+
+// -- URL/header sanitisation helpers ----------------------------------------
+//
+// The `apiKey` query param is a credential meant only for the proxy
+// boundary — upstream tools (Ungit here) must never see it. We also strip
+// the Referer header for the same reason: it can leak the apiKey when the
+// browser navigated from a URL that carried `?apiKey=`.
+
+/**
+ * Return `url.search` with any `apiKey` param (case-insensitive) removed.
+ * Returns "" if no params remain, or "?…" otherwise.
+ */
+function searchWithoutApiKey(url: URL): string {
+  const sp = new URLSearchParams();
+  for (const [k, v] of url.searchParams) {
+    if (k.toLowerCase() === "apikey") continue;
+    sp.append(k, v);
+  }
+  const s = sp.toString();
+  return s ? `?${s}` : "";
+}
+
+/**
+ * For mutating requests authenticated by a session cookie, require an
+ * Origin or Referer that matches the proxy's own host. CSRF shield —
+ * cookie is SameSite=None for iframe embedding so the browser will send
+ * it on cross-site requests; the origin check is what blocks them.
+ */
+function originAllowed(request: Request): boolean {
+  const method = request.method.toUpperCase();
+  if (method === "GET" || method === "HEAD") return true;
+
+  const proxyHost = new URL(request.url).host;
+  const origin = request.headers.get("origin");
+  if (origin) {
+    try {
+      return new URL(origin).host === proxyHost;
+    } catch {
+      return false;
+    }
+  }
+  const referer = request.headers.get("referer");
+  if (referer) {
+    try {
+      return new URL(referer).host === proxyHost;
+    } catch {
+      return false;
+    }
+  }
+  return false;
+}
 
 const sessions = new Map<string, Session>();
 
@@ -171,6 +222,14 @@ async function handleProxyRequest(
     );
   }
 
+  // CSRF guard for cookie-authed mutating requests.
+  if (!hasValidApiKey && hasValidSession && !originAllowed(request)) {
+    return new Response(
+      JSON.stringify({ error: "Forbidden -- invalid Origin" }),
+      { status: 403, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   // If authenticated via API key but no session cookie, create session and
   // serve the proxied content directly (with Set-Cookie header).
   let sessionCookieHeader: string | null = null;
@@ -213,7 +272,10 @@ async function handleHttpProxy(
 ): Promise<Response> {
   const url = new URL(request.url);
   const strippedPath = stripPrefix(url.pathname);
-  const upstreamUrl = `http://127.0.0.1:${port}${strippedPath}${url.search}`;
+  // Strip apiKey from query before forwarding — it's a proxy-boundary
+  // credential and must never reach Ungit.
+  const sanitisedSearch = searchWithoutApiKey(url);
+  const upstreamUrl = `http://127.0.0.1:${port}${strippedPath}${sanitisedSearch}`;
 
   // Build upstream headers (copy most, skip hop-by-hop)
   const upstreamHeaders = new Headers();
@@ -226,6 +288,8 @@ async function handleHttpProxy(
     "upgrade",
     "proxy-authorization",
     "proxy-authenticate",
+    // Drop Referer — it may carry `?apiKey=` from the parent iframe URL.
+    "referer",
   ]);
 
   request.headers.forEach((value, key) => {

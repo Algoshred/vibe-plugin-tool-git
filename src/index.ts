@@ -245,17 +245,18 @@ export const createPlugin: VibePluginFactory = (
     async onServerReady() {
       // Contribute capability metadata to the LLM Context feature.
       try {
-        const sdkContext = (await import("@vibecontrols/plugin-sdk/context")) as {
-          registerContextProvider?: (provider: {
-            name: string;
-            timeoutMs?: number;
-            getContext: () => Promise<{
-              pluginName: string;
-              description?: string;
-              data: Record<string, unknown>;
-            }>;
-          }) => void;
-        };
+        const sdkContext =
+          (await import("@vibecontrols/plugin-sdk/context")) as {
+            registerContextProvider?: (provider: {
+              name: string;
+              timeoutMs?: number;
+              getContext: () => Promise<{
+                pluginName: string;
+                description?: string;
+                data: Record<string, unknown>;
+              }>;
+            }) => void;
+          };
         sdkContext.registerContextProvider?.({
           name: "tool-git",
           timeoutMs: 500,
