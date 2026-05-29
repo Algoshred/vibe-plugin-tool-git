@@ -71,19 +71,26 @@
     </div>
     <script type="module">
       const ENVELOPE_VERSION = 1;
+      // Origin allowlist for postMessage handshake. Hosts that embed this
+      // plugin UI inside an iframe must match one of these patterns. To extend
+      // with additional hosts, set VIBE_UI_ALLOWED_ORIGINS at the agent
+      // (comma-separated host or *.suffix entries) and the agent will
+      // template them into this allowlist at install time.
       function isAllowed(origin) {
         try {
           const u = new URL(origin);
-          return (
-            u.hostname === "localhost" ||
-            u.hostname === "127.0.0.1" ||
-            u.hostname.endsWith(".local.burdenoff.com") ||
-            u.hostname === "vibecontrols.com" ||
-            u.hostname.endsWith(".vibecontrols.com") ||
-            u.hostname === "burdenoff.com" ||
-            u.hostname === "app.burdenoff.com" ||
-            u.hostname === "alphaapp.burdenoff.com"
-          );
+          if (u.hostname === "localhost" || u.hostname === "127.0.0.1") return true;
+          if (u.hostname === "vibecontrols.com") return true;
+          if (u.hostname.endsWith(".vibecontrols.com")) return true;
+          const extra = (globalThis.__VIBE_UI_EXTRA_HOSTS__ || []);
+          for (const h of extra) {
+            if (h.startsWith("*.")) {
+              if (u.hostname.endsWith(h.slice(1))) return true;
+            } else if (u.hostname === h) {
+              return true;
+            }
+          }
+          return false;
         } catch {
           return false;
         }
