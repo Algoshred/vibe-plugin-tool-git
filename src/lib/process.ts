@@ -5,6 +5,8 @@
  * Ungit binds to 127.0.0.1 only -- access is via the agent reverse proxy.
  */
 
+import { homedir as osHomedir } from "node:os";
+
 import type { Subprocess } from "bun";
 import type { UngitStatus } from "../types.js";
 
@@ -149,7 +151,11 @@ export async function startUngit(options?: {
 
   try {
     const port = await findAvailablePort(options?.port);
-    const workingDir = options?.workingDir || process.env.HOME || "/";
+    // os.homedir() resolves USERPROFILE on Windows / HOME on POSIX; the
+    // previous `process.env.HOME || "/"` fallback silently aimed Windows
+    // agents at `C:\` (filesystem root) and any unconfigured POSIX agent
+    // at whatever working dir its parent shell happened to be in.
+    const workingDir = options?.workingDir || osHomedir() || "/";
 
     // Resolve ungit binary
     const install = await checkInstallation();

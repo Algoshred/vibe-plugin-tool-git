@@ -14,6 +14,8 @@
  * concerns like prefix, error handler, and logging fold through the SDK.
  */
 
+import { homedir as osHomedir } from "node:os";
+
 import type { Elysia } from "elysia";
 
 import { RoutesBuilder } from "@vibecontrols/plugin-sdk/routes";
@@ -118,7 +120,11 @@ export function createUngitRoutes(hostServices: HostServices): Elysia {
           message: "Ungit started",
           pid: result.pid,
           port: result.port,
-          workingDir: workingDir || process.env.HOME || "/",
+          // os.homedir() resolves USERPROFILE on Windows / HOME on
+          // POSIX; the previous `process.env.HOME || "/"` fallback
+          // silently aimed Windows agents at the filesystem root and
+          // broke every Ungit launch there.
+          workingDir: workingDir || osHomedir() || "/",
         };
       } catch (err) {
         set.status = 500;
@@ -152,7 +158,11 @@ export function createUngitRoutes(hostServices: HostServices): Elysia {
           message: "Ungit restarted",
           pid: result.pid,
           port: result.port,
-          workingDir: workingDir || process.env.HOME || "/",
+          // os.homedir() resolves USERPROFILE on Windows / HOME on
+          // POSIX; the previous `process.env.HOME || "/"` fallback
+          // silently aimed Windows agents at the filesystem root and
+          // broke every Ungit launch there.
+          workingDir: workingDir || osHomedir() || "/",
         };
       } catch (err) {
         set.status = 500;
