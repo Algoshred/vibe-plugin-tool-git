@@ -115,7 +115,7 @@ let agentApiKey: string | null = null;
 // ---------------------------------------------------------------------------
 
 const PLUGIN_NAME = "ungit";
-const PLUGIN_VERSION = "2026.509.2";
+const PLUGIN_VERSION = "2026.531.1";
 
 export const createPlugin: VibePluginFactory = (
   _ctx: ProfileContext,
@@ -156,7 +156,17 @@ export const createPlugin: VibePluginFactory = (
       // by the reverse-proxy below — not via this staticDir.
       staticDir: `${import.meta.dir}/ui-git`,
       capabilities: {
-        restPaths: ["/ungit", "/api/ungit", "/ui/ungit"],
+        // P0-SEC-03 — `restPaths` is used by `PluginIframeMount` to
+        // request a scoped iframe-token. The agent's allow-list only
+        // permits browser-bound prefixes (`/ui/<plugin>`,
+        // `/api/plugins/<plugin>/ui`, …). The Ungit reverse proxy at
+        // `/ungit/*` is a separate auth boundary (publicPath +
+        // proxy-side `?apiKey=` -> session cookie) and is NOT iframe-
+        // token authed, so it cannot appear in this list. `/api/ungit`
+        // is svc-to-agent only (x-agent-api-key) — also not browser-
+        // callable. Only `/ui/ungit` (the inline Git metadata iframe)
+        // is browser+iframe-token bound.
+        restPaths: ["/ui/ungit"],
         wsTopics: [],
         rpcMethods: ["getContext"],
       },
@@ -179,10 +189,14 @@ export const createPlugin: VibePluginFactory = (
           },
         },
         // PR-12c — GitOps (Ungit) tab migration. The iframe loads the
-        // existing `/ungit/` reverse-proxied UI directly; `meta.url`
-        // overrides the default `/ui/<pluginKey>` so the iframe src
-        // points at the Ungit subprocess. Same ordering slot as the
-        // inline `gitops` tab.
+        // existing `/ungit/` reverse-proxied UI directly via `meta.url`.
+        // Auth for `/ungit/*` is the proxy's own `?apiKey=` boundary
+        // (NOT iframe-token); the iframe-token minted from `restPaths`
+        // here only covers the contribution's default-URL surface
+        // (`/ui/ungit`) — the Ungit subprocess at `/ungit/*` validates
+        // its own session cookie + apiKey upstream. `/api/ungit` is
+        // svc-to-agent only and so is NOT browser-callable and was
+        // removed from `restPaths` under P0-SEC-03.
         {
           mountPoint: "vibe.detailTab",
           id: "plugin:gitops",
@@ -191,7 +205,7 @@ export const createPlugin: VibePluginFactory = (
           order: 95,
           runtimes: ["iframe"],
           capabilities: {
-            restPaths: ["/ungit", "/api/ungit"],
+            restPaths: ["/ui/ungit"],
             wsTopics: [],
             rpcMethods: [],
           },
