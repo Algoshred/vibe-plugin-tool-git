@@ -1,7 +1,7 @@
 /**
  * Ungit Reverse Proxy
  *
- * Proxies all requests from /ungit/* to the local Ungit instance.
+ * Proxies all requests from /git/* to the local Ungit instance.
  * Handles:
  *   - Session cookie authentication (Ungit internal requests can't send API key headers)
  *   - HTTP reverse proxying with streaming
@@ -36,7 +36,10 @@ const COOKIE_NAME = "__vibe_ungit_session";
 function searchWithoutApiKey(url: URL): string {
   const sp = new URLSearchParams();
   for (const [k, v] of url.searchParams) {
-    if (k.toLowerCase() === "apikey") continue;
+    const lower = k.toLowerCase();
+    // Strip apiKey + vt iframe-token before forwarding upstream — both are
+    // proxy-boundary credentials and must never reach Ungit.
+    if (lower === "apikey" || lower === "vt") continue;
     sp.append(k, v);
   }
   const s = sp.toString();
@@ -130,12 +133,23 @@ function getCookie(cookieHeader: string | null, name: string): string | null {
 function isAuthed(
   request: Request,
   validateApiKey: (key: string) => boolean,
+  validateIframeToken: (token: string, path: string) => boolean,
 ): { hasValidSession: boolean; hasValidApiKey: boolean } {
   const cookieHeader = request.headers.get("cookie");
   const sessionToken = getCookie(cookieHeader, COOKIE_NAME);
   const apiKeyHeader = request.headers.get("x-agent-api-key");
   const url = new URL(request.url);
   const apiKeyParam = url.searchParams.get("apiKey");
+  // audit-B P0-SEC-03 residual — the microfe mints a single-use iframe token
+  // scoped to `/git` and appends it as `?vt=<token>` for the entry document
+  // (header injection is unavailable for top-level navigation). The proxy
+  // accepts it once to bootstrap the session cookie, after which sub-
+  // requests reuse the cookie.
+  const vtParam = url.searchParams.get("vt");
+  const vtHeader =
+    request.headers.get("x-vibe-iframe-token") ??
+    request.headers.get("X-Vibe-Iframe-Token");
+  const vtToken = vtHeader ?? vtParam;
 
   const hasValidSession = sessionToken
     ? validateSessionToken(sessionToken)
@@ -146,6 +160,14 @@ function isAuthed(
   let hasValidApiKey =
     (apiKeyHeader != null && validateApiKey(apiKeyHeader)) ||
     (apiKeyParam != null && validateApiKey(apiKeyParam));
+
+  if (!hasValidApiKey && !hasValidSession && vtToken) {
+    // Iframe-token verify is scoped to the `/git` prefix. The agent's
+    // verifier checks signature + expiry + single-use JTI + prefix cover.
+    if (validateIframeToken(vtToken, url.pathname)) {
+      hasValidApiKey = true;
+    }
+  }
 
   if (!hasValidApiKey && !hasValidSession) {
     const referer = request.headers.get("referer");
@@ -168,7 +190,7 @@ function isAuthed(
 // -- Path helpers -----------------------------------------------------------
 
 function stripPrefix(pathname: string): string {
-  // With --rootPath /ungit, Ungit handles the /ungit prefix itself.
+  // With --rootPath /git, Ungit handles the /git prefix itself.
   // Pass the path through without stripping.
   return pathname || "/";
 }
@@ -192,17 +214,28 @@ const STRIP_RESPONSE_HEADERS = new Set([
 export function createUngitProxy(
   getPort: () => number | null,
   validateApiKey: (key: string) => boolean,
+  validateIframeToken: (token: string, path: string) => boolean = () => false,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 ): any {
   // WebSocket bridge is intentionally disabled: Elysia's .ws() handler
   // intercepts socket.io HTTP long-polling requests, breaking the transport.
   // Socket.io falls back to HTTP polling which works through .all() proxy.
-  return new Elysia({ prefix: "/ungit" })
+  return new Elysia({ prefix: "/git" })
     .all("/*", async ({ request }) => {
-      return handleProxyRequest(request, getPort, validateApiKey);
+      return handleProxyRequest(
+        request,
+        getPort,
+        validateApiKey,
+        validateIframeToken,
+      );
     })
     .all("/", async ({ request }) => {
-      return handleProxyRequest(request, getPort, validateApiKey);
+      return handleProxyRequest(
+        request,
+        getPort,
+        validateApiKey,
+        validateIframeToken,
+      );
     });
 }
 
@@ -210,8 +243,13 @@ async function handleProxyRequest(
   request: Request,
   getPort: () => number | null,
   validateApiKey: (key: string) => boolean,
+  validateIframeToken: (token: string, path: string) => boolean,
 ): Promise<Response> {
-  const { hasValidSession, hasValidApiKey } = isAuthed(request, validateApiKey);
+  const { hasValidSession, hasValidApiKey } = isAuthed(
+    request,
+    validateApiKey,
+    validateIframeToken,
+  );
 
   if (!hasValidSession && !hasValidApiKey) {
     return new Response(
@@ -235,7 +273,7 @@ async function handleProxyRequest(
   let sessionCookieHeader: string | null = null;
   if (!hasValidSession && hasValidApiKey) {
     const session = createSession();
-    sessionCookieHeader = `${COOKIE_NAME}=${session.token}; Path=/ungit/; HttpOnly; SameSite=None; Secure; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`;
+    sessionCookieHeader = `${COOKIE_NAME}=${session.token}; Path=/git/; HttpOnly; SameSite=None; Secure; Max-Age=${Math.floor(SESSION_TTL_MS / 1000)}`;
   }
 
   // Verify Ungit is running
@@ -323,7 +361,7 @@ async function handleHttpProxy(
     // Ensure HTML responses have correct content-type (ungit sends application/octet-stream)
     // Only check the root path to avoid consuming response bodies of other endpoints
     const contentType = upstreamResponse.headers.get("content-type") || "";
-    if (strippedPath === "/ungit/" && !contentType.includes("text/html")) {
+    if (strippedPath === "/git/" && !contentType.includes("text/html")) {
       const body = await upstreamResponse.text();
       if (
         body.trimStart().startsWith("<!DOCTYPE") ||

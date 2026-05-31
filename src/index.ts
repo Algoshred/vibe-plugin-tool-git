@@ -3,11 +3,11 @@
  *
  * Visual Git Client via Ungit — reverse-proxied through the VibeControls
  * agent. Manages the Ungit child process lifecycle (install, start, stop)
- * and proxies all traffic at /ungit/* with session cookie auth.
+ * and proxies all traffic at /git/* with session cookie auth.
  *
  * Registers:
- *   - Elysia routes: /api/ungit/*  (REST API)
- *   - Proxy routes:  /ungit/*      (reverse proxy to ungit)
+ *   - Elysia routes: /api/ungit/*  (REST API, svc-to-agent only)
+ *   - Proxy routes:  /git/*        (reverse proxy to ungit, browser-bound)
  *   - CLI command:   vibe ungit {status,install,start,stop,restart}
  *
  * Migrated to consume `@vibecontrols/plugin-sdk` for the contract,
@@ -115,7 +115,7 @@ let agentApiKey: string | null = null;
 // ---------------------------------------------------------------------------
 
 const PLUGIN_NAME = "ungit";
-const PLUGIN_VERSION = "2026.531.1";
+const PLUGIN_VERSION = "2026.531.2";
 
 export const createPlugin: VibePluginFactory = (
   _ctx: ProfileContext,
@@ -147,7 +147,14 @@ export const createPlugin: VibePluginFactory = (
     hasUI: true,
     cliCommand: "ungit",
     apiPrefix: "/api/ungit",
-    publicPaths: ["/ungit/"],
+    // audit-B P0-SEC-03 residual closure — Ungit's reverse-proxied UI
+    // moved from `/ungit/` to `/git/` so the agent's iframe-token allow-
+    // list (`isValidIframePathPrefix`) can scope a single-use token to
+    // it (sibling of `/terminal`, `/plan`, `/code-server`). The agent's
+    // auth middleware exempts `/git` because the proxy below is the
+    // auth boundary; the proxy now accepts a `?vt=` iframe-token in
+    // addition to `?apiKey=` / session cookie.
+    publicPaths: ["/git/"],
     ui: {
       title: "GitOps",
       icon: "GitMerge",
@@ -209,7 +216,7 @@ export const createPlugin: VibePluginFactory = (
             wsTopics: [],
             rpcMethods: [],
           },
-          meta: { url: "/ungit/" },
+          meta: { url: "/git/" },
         },
       ],
     },
@@ -234,8 +241,24 @@ export const createPlugin: VibePluginFactory = (
         agentApiKey = process.env.AGENT_API_KEY ?? null;
       }
 
-      // Mount reverse proxy at /ungit/*
+      // Mount reverse proxy at /git/*
       const { createUngitProxy } = await import("./lib/proxy.js");
+      // audit-B P0-SEC-03 residual — bridge the agent's iframe-token
+      // verifier into the proxy so the entry document's `?vt=<token>`
+      // exchange can bootstrap a proxy session cookie without leaking
+      // the master api key. Older agents without `iframeBridge` fall
+      // back to api-key-only auth (legacy `?apiKey=` path still works).
+      const bridge = (
+        hostServices as unknown as {
+          iframeBridge?: {
+            verifyIframeToken: (token: string, path: string) => boolean;
+          };
+        }
+      ).iframeBridge;
+      const verifyIframeToken = bridge
+        ? (token: string, path: string) =>
+            bridge.verifyIframeToken(token, path)
+        : () => false;
       elysiaApp.use(
         createUngitProxy(
           () => getRunningPort(),
@@ -243,11 +266,12 @@ export const createPlugin: VibePluginFactory = (
             if (!agentApiKey) return false;
             return key === agentApiKey;
           },
+          verifyIframeToken,
         ),
       );
 
       process.stdout.write(
-        "  Plugin 'ungit' registered routes: /api/ungit, /ungit\n",
+        "  Plugin 'ungit' registered routes: /api/ungit, /git\n",
       );
     },
 

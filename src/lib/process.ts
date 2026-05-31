@@ -171,7 +171,7 @@ export async function startUngit(options?: {
       "--ungitBindIp",
       "127.0.0.1",
       "--rootPath",
-      "/ungit",
+      "/git",
     ];
 
     const proc = Bun.spawn(args, {
