@@ -81,7 +81,7 @@ export async function checkInstallation(): Promise<{
 
   // Check global via Bun.which (cross-platform; handles PATHEXT on Windows).
   try {
-    const path = Bun.which("ungit");
+    const path = Bun.which("ungit", { PATH: process.env.PATH });
     if (path) {
       return { installed: true, binaryPath: path };
     }

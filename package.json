@@ -1,6 +1,6 @@
 {
   "name": "@vibecontrols/vibe-plugin-tool-git",
-  "version": "2026.531.2",
+  "version": "2026.601.1",
   "main": "./dist/index.js",
   "type": "module",
   "engines": {
@@ -34,7 +34,7 @@
   "license": "MIT",
   "description": "Visual Git Client (Ungit) — reverse-proxied through the VibeControls agent",
   "dependencies": {
-    "@vibecontrols/plugin-sdk": "2026.527.1",
+    "@vibecontrols/plugin-sdk": "2026.601.1",
     "ungit": "^1.5.28"
   },
   "devDependencies": {
