@@ -125,7 +125,7 @@ setInterval(cleanupSessions, 10 * 60 * 1000);
 function getCookie(cookieHeader: string | null, name: string): string | null {
   if (!cookieHeader) return null;
   const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
-  return match ? match[1] : null;
+  return match?.[1] ?? null;
 }
 
 // -- Auth helpers -----------------------------------------------------------
@@ -401,5 +401,3 @@ async function handleHttpProxy(
     );
   }
 }
-
-export default createUngitProxy;

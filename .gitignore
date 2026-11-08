@@ -19,3 +19,5 @@ temp/
 **/.build-sha
 
 .playwright-cli/
+junit.xml
+.eslintcache
