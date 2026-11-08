@@ -256,8 +256,7 @@ export const createPlugin: VibePluginFactory = (
         }
       ).iframeBridge;
       const verifyIframeToken = bridge
-        ? (token: string, path: string) =>
-            bridge.verifyIframeToken(token, path)
+        ? (token: string, path: string) => bridge.verifyIframeToken(token, path)
         : () => false;
       elysiaApp.use(
         createUngitProxy(
